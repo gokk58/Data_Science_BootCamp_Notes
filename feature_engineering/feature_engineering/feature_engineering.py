@@ -2,6 +2,8 @@
 # FEATURE ENGINEERING & DATA PRE-PROCESSING
 #############################################
 
+# DATA Preparation = Data Processing & Wrangling + Feature Extraction & Engineering + Feature Scaling & Selectin
+
 import numpy as np
 import pandas as pd
 import seaborn as sns
@@ -23,12 +25,12 @@ def load_application_train():
     data = pd.read_csv("datasets/application_train.csv")
     return data
 
-df = load_application_train()
+dff = load_application_train()
 df.head()
 
 
 def load():
-    data = pd.read_csv("datasets/titanic.csv")
+    data = pd.read_csv("feature_engineering/feature_engineering/datasets/titanic.csv")
     return data
 
 
@@ -40,6 +42,18 @@ df.head()
 #############################################
 # 1. Outliers (Aykırı Değerler)
 #############################################
+# Verideki genel eğilimin oldukça dışına çıkan değerlere aykırı değerler denir.
+# Aykırı degerlerin dogrusal problemlerde etkisi yuksek iken, agac yontemlerinde bu etkisi dusuktur.
+
+# Aykiri Degerler neye gore belirlenir;
+
+# 1- Sektör bilgisi
+# 2- Standart Sapma Yaklasimi
+# 3- Z-skoru Yaklasimi
+# 4- Tek degiskenli olarak Boxplot yontemi(Interquantile range) /// Cok degiskenli olarak LOF yontemi
+
+##
+
 
 #############################################
 # Aykırı Değerleri Yakalama
@@ -56,14 +70,18 @@ plt.show()
 # Aykırı Değerler Nasıl Yakalanır?
 ###################
 
+# bir degisken icerisindeki quantile degerlerine ulasmamız gerekir ki IQR hesaplamasi yapabilelim
+
+
 q1 = df["Age"].quantile(0.25)
 q3 = df["Age"].quantile(0.75)
 iqr = q3 - q1
 up = q3 + 1.5 * iqr
 low = q1 - 1.5 * iqr
 
+# aykiri degerleri iceren gozlemlere erismek icin ;
 df[(df["Age"] < low) | (df["Age"] > up)]
-
+# indexlerine erismek icin;
 df[(df["Age"] < low) | (df["Age"] > up)].index
 
 ###################
@@ -81,7 +99,9 @@ df[(df["Age"] < low)].any(axis=None)
 # İşlemleri Fonksiyonlaştırmak
 ###################
 
-
+#### ADIM 1 ######
+# fonksiyonda belirtilen threshold degerleri veri setinden veri setine degisebilir ancak -
+## literatürde teorik kabul 0.25 ve 0.75 tir.
 def outlier_thresholds(dataframe, col_name, q1=0.25, q3=0.75):
     quartile1 = dataframe[col_name].quantile(q1)
     quartile3 = dataframe[col_name].quantile(q3)
@@ -95,11 +115,16 @@ outlier_thresholds(df, "Fare")
 
 low, up = outlier_thresholds(df, "Fare")
 
+##### ADIM 2 ######
+# outlier_threshodl fonksiyonu ile up ve low limitleri cikti olarak elde ediyoruz -
+## ardindan bu degelere gore aykiri degerleri iceren gozlemlerin varligini sorgulamak istiyoruz.
+
+
 df[(df["Fare"] < low) | (df["Fare"] > up)].head()
-
-
 df[(df["Fare"] < low) | (df["Fare"] > up)].index
-
+# burada index bilgilerine ya da gozlemlere ulasmak degilde, aykiri degerlerin varligi veya yoklugunu -
+## belirlemek istiyoruz cunku kod akisi icerisinde ciktinin TRUE ya da FALSE olmasi durumuna göre -
+### akisin devam etmesini istiyoruz.
 def check_outlier(dataframe, col_name):
     low_limit, up_limit = outlier_thresholds(dataframe, col_name)
     if dataframe[(dataframe[col_name] > up_limit) | (dataframe[col_name] < low_limit)].any(axis=None):
@@ -114,8 +139,17 @@ check_outlier(df, "Fare")
 # grab_col_names
 ###################
 
+##### ADIM 3 #############
+# programatik olarak check_outlier fonksiyonunu istedimiz veri setinde istedimiz degiskene uygulamak istiyoruz -
+## ancak onemli bir sorun her degiskenin tipini bilmiyor olusumuz.
+
+# Bu problemin ustesinden gelmek icin oyle bir islem yapmamız lazim ki bize bir veri seti icerisindeki -
+## sayisal degiskenleri, kategorik degiskenleri, kategorik olsa bile sayisal gorunumlu ve kategorik gorunumlu olup -
+### bilgi tasimayan, cok fazli sinifa sahip olan degiskenler.
+
 dff = load_application_train()
 dff.head()
+
 
 def grab_col_names(dataframe, cat_th=10, car_th=20):
     """
@@ -196,6 +230,11 @@ for col in num_cols:
 # Aykırı Değerlerin Kendilerine Erişmek
 ###################
 
+## Aykiri degerleri yakalayip, onlara erismek icin bir fonksiyon yazmak istiyoruz.
+
+# Fonksiyonun amacı, bir degisken icerisindeki aykiri gozlemler erismek ancak eger aykiri gozlem sayisi -
+## 10 dan fazla ise yalnızce ilk 5 gozlemi gostersin, 10 dan az ise hepsini gostersiz ve istersek indexleri-
+### gostersin.
 def grab_outliers(dataframe, col_name, index=False):
     low, up = outlier_thresholds(dataframe, col_name)
 
@@ -304,7 +343,15 @@ check_outlier(df, "Age")
 # Çok Değişkenli Aykırı Değer Analizi: Local Outlier Factor
 #############################################
 
+# tek basına degerlendirildiginde aykiri olmayan iki degisken degeri, birlikte incelendiginde aykirilik iceri-
+## yor olabilir.
+
 # 17, 3
+
+# LOF yontemi, gozlemleri bulundukları konumda yogunluk tabanlı skorlayarak, buna göre aykırı deger tanımı yapa-
+## bilmemizi saglar.
+
+# Bir noktanın lokal yogunlugu demek, ilgili noktanın etrafındaki komsuluklar demektir.
 
 df = sns.load_dataset('diamonds')
 df = df.select_dtypes(include=['float64', 'int64'])
@@ -323,18 +370,25 @@ low, up = outlier_thresholds(df, "depth")
 
 df[((df["depth"] < low) | (df["depth"] > up))].shape
 
+# ön tanımlı olarak 20 tercih ettik, fonksiyon icerisinde de bu böyle
 clf = LocalOutlierFactor(n_neighbors=20)
 clf.fit_predict(df)
 
+# outlier degerlerini - olarak skorladı ve bu ileride yapcagimiz analizde daha kolay okunurluk saglayacak
+## skorlanan degerlerde, -1 e yaklastikca inlier ve -1 den uzaklastiksa outlier olma durumu ifade ediliyor.
 df_scores = clf.negative_outlier_factor_
 df_scores[0:5]
 # df_scores = -df_scores
 np.sort(df_scores)[0:5]
 
+# PCA de, esik degerlerine yoruma dayali belirmek icin dirsek yontemi uyguluyoruz
+## alttaki kod ile acilan grafikte y ekseni outlier skorlarini x ekseni ise gozlemleri gosteriyor.
+### Burada y ekseninde en keskin egime sahip olan gozlem threshold olarak secilebilir
 scores = pd.DataFrame(np.sort(df_scores))
-scores.plot(stacked=True, xlim=[0, 50], style='.-')
+scores.plot(stacked=True, xlim=[0, 50], style='.-') # xlim[0,50] ilk 50 gozlem goster
 plt.show()
 
+# Esik deger 3. gozlemden baslıyor dolayisiyla 3. gozlem ait skoru esik deger olarak atıyoruz
 th = np.sort(df_scores)[3]
 
 df[df_scores < th]
